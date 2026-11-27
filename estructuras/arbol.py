@@ -1,3 +1,11 @@
+def clave(valor):
+    # Sirve para comparar valores de distinto tipo dentro del mismo árbol:
+    # primero van los números (de menor a mayor) y después los textos (en orden alfabético).
+    if isinstance(valor, str):
+        return (1, valor.casefold(), valor)
+    return (0, valor, "")
+
+
 class NodoBST:
     def __init__(self, valor):
         self.valor = valor
@@ -11,39 +19,48 @@ class ArbolBST:
         self.cantidad = 0
 
     def insertar(self, valor):
+        # Se permiten repetidos: un valor igual al del nodo se manda a la derecha.
+        nuevo = NodoBST(valor)
         if self.raiz is None:
-            self.raiz = NodoBST(valor)
+            self.raiz = nuevo
             self.cantidad = 1
-            return True
+            return nuevo
         actual = self.raiz
         while True:
-            if valor == actual.valor:
-                return False
-            if valor < actual.valor:
+            if clave(valor) < clave(actual.valor):
                 if actual.izq is None:
-                    actual.izq = NodoBST(valor)
+                    actual.izq = nuevo
                     break
                 actual = actual.izq
             else:
                 if actual.der is None:
-                    actual.der = NodoBST(valor)
+                    actual.der = nuevo
                     break
                 actual = actual.der
         self.cantidad = self.cantidad + 1
-        return True
+        return nuevo
 
     def buscar(self, valor):
+        # Regresa la lista de nodos visitados y si se encontró el valor
+        # (si está repetido, se queda con el primero que encuentra, el más arriba).
         camino = []
         actual = self.raiz
         while actual is not None:
-            camino.append(actual.valor)
-            if valor == actual.valor:
+            camino.append(actual)
+            if clave(valor) == clave(actual.valor):
                 return camino, True
-            if valor < actual.valor:
+            if clave(valor) < clave(actual.valor):
                 actual = actual.izq
             else:
                 actual = actual.der
         return camino, False
+
+    def contar(self, valor):
+        veces = 0
+        for nodo in self.nodos_inorden():
+            if clave(nodo.valor) == clave(valor):
+                veces = veces + 1
+        return veces
 
     def cambiar_hijo(self, padre, viejo, nuevo):
         if padre is None:
@@ -54,11 +71,12 @@ class ArbolBST:
             padre.der = nuevo
 
     def eliminar(self, valor):
+        # Si el valor está repetido, elimina solo una copia (la primera que encuentra).
         padre = None
         actual = self.raiz
-        while actual is not None and actual.valor != valor:
+        while actual is not None and clave(actual.valor) != clave(valor):
             padre = actual
-            if valor < actual.valor:
+            if clave(valor) < clave(actual.valor):
                 actual = actual.izq
             else:
                 actual = actual.der
@@ -83,35 +101,46 @@ class ArbolBST:
         self.cantidad = self.cantidad - 1
         return True
 
-    def preorden(self):
+    # Los recorridos guardan los nodos (para poder dibujarlos aunque haya valores repetidos)
+    # y las funciones preorden / inorden / postorden regresan solo los valores.
+    def nodos_preorden(self):
         resultado = []
         self.recorrer_pre(self.raiz, resultado)
         return resultado
 
-    def recorrer_pre(self, nodo, resultado):
-        if nodo is not None:
-            resultado.append(nodo.valor)
-            self.recorrer_pre(nodo.izq, resultado)
-            self.recorrer_pre(nodo.der, resultado)
-
-    def inorden(self):
+    def nodos_inorden(self):
         resultado = []
         self.recorrer_in(self.raiz, resultado)
         return resultado
 
-    def recorrer_in(self, nodo, resultado):
-        if nodo is not None:
-            self.recorrer_in(nodo.izq, resultado)
-            resultado.append(nodo.valor)
-            self.recorrer_in(nodo.der, resultado)
-
-    def postorden(self):
+    def nodos_postorden(self):
         resultado = []
         self.recorrer_post(self.raiz, resultado)
         return resultado
+
+    def preorden(self):
+        return [nodo.valor for nodo in self.nodos_preorden()]
+
+    def inorden(self):
+        return [nodo.valor for nodo in self.nodos_inorden()]
+
+    def postorden(self):
+        return [nodo.valor for nodo in self.nodos_postorden()]
+
+    def recorrer_pre(self, nodo, resultado):
+        if nodo is not None:
+            resultado.append(nodo)
+            self.recorrer_pre(nodo.izq, resultado)
+            self.recorrer_pre(nodo.der, resultado)
+
+    def recorrer_in(self, nodo, resultado):
+        if nodo is not None:
+            self.recorrer_in(nodo.izq, resultado)
+            resultado.append(nodo)
+            self.recorrer_in(nodo.der, resultado)
 
     def recorrer_post(self, nodo, resultado):
         if nodo is not None:
             self.recorrer_post(nodo.izq, resultado)
             self.recorrer_post(nodo.der, resultado)
-            resultado.append(nodo.valor)
+            resultado.append(nodo)

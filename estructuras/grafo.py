@@ -10,12 +10,13 @@ class Grafo:
         self.vertices = []
         self.aristas = []    
 
-    def agregar_vertice(self):
-        if len(self.vertices) >= 10:
-            return None
-        letra = chr(ord("A") + len(self.vertices))
-        self.vertices.append(letra)
-        return letra
+    def agregar_vertice(self, nombre):
+        # El nombre lo escribe el usuario (cualquier texto) y no hay límite de vértices.
+        # Lo único que no se permite es repetir un nombre, porque así se identifica al vértice.
+        if nombre in self.vertices:
+            return False
+        self.vertices.append(nombre)
+        return True
 
     def existe_arista(self, a, b):
         for origen, destino, peso in self.aristas:

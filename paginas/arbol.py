@@ -1,9 +1,12 @@
+import math
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk
 from config import *
 from interfaz.componentes import *
 
 RADIO = 20
+MAX_CARACTERES = 12
 
 
 class PaginaArbol(tk.Frame):
@@ -19,11 +22,13 @@ class PaginaArbol(tk.Frame):
         centro.columnconfigure(1, weight=1)
         centro.rowconfigure(0, weight=1)
 
-        izq = tarjeta(centro, "Opciones", "Número del 1 al 99")
+        izq = tarjeta(centro, "Opciones", "Números, letras o símbolos\n(se permiten repetidos)")
         izq.grid(row=0, column=0, sticky="n", padx=(0, 16))
         etiqueta_campo(izq, "Valor")
-        self.spin, self.var_valor = spin(izq, range(1, 100))
-        self.spin.pack(anchor="w", ipady=4)
+        self.entrada, self.var_valor = entrada(self, izq, MAX_CARACTERES)
+        self.entrada.pack(fill="x", ipady=5)
+        self.entrada.bind("<Return>", lambda e: self.crear())
+        self.fuente_nodo = tkfont.Font(self, family=FUENTE, size=11, weight="bold")
         Boton(izq, "Crear Nodo", self.crear, "principal").pack(fill="x", pady=(14, 8))
         Boton(izq, "Buscar Nodo", self.buscar, "secundario").pack(fill="x", pady=(0, 8))
         Boton(izq, "Eliminar Nodo", self.eliminar, "peligro").pack(fill="x")
@@ -81,26 +86,37 @@ class PaginaArbol(tk.Frame):
         self.lbl_recorrido.config(text="Recorrido: —")
 
     def leer_valor(self):
+        # Acepta cualquier número (enteros, negativos o con punto decimal) y, si no es número,
+        # lo guarda como texto: letras, palabras o caracteres especiales.
+        texto = self.var_valor.get().strip()
+        if texto == "":
+            return None
         try:
-            valor = int(self.var_valor.get())
+            return int(texto)
         except ValueError:
-            return None
-        if valor < 1 or valor > 99:
-            return None
-        return valor
+            pass
+        try:
+            numero = float(texto)
+            if math.isfinite(numero):
+                return numero
+        except ValueError:
+            pass
+        return texto
 
     def crear(self):
         try:
             valor = self.leer_valor()
             if valor is None:
-                avisar(self.mensaje, "El valor debe estar entre 1 y 99.", "warn")
+                avisar(self.mensaje, "Escribe un valor (número, letra o símbolo).", "warn")
                 return
-            if not self.datos.arbol.insertar(valor):
-                avisar(self.mensaje, f"El valor {valor} ya existe en el árbol (no se permiten repetidos).", "warn")
-                return
+            self.datos.arbol.insertar(valor)
             self.limpiar_resaltado()
             self.dibujar()
-            avisar(self.mensaje, f"Nodo {valor} agregado.", "ok")
+            veces = self.datos.arbol.contar(valor)
+            if veces > 1:
+                avisar(self.mensaje, f"Nodo {valor} agregado (repetido, ahora hay {veces}; los iguales van a la derecha).", "ok")
+            else:
+                avisar(self.mensaje, f"Nodo {valor} agregado.", "ok")
         except Exception as error:
             avisar(self.mensaje, "Ocurrió un problema: " + str(error), "error")
 
@@ -108,7 +124,7 @@ class PaginaArbol(tk.Frame):
         try:
             valor = self.leer_valor()
             if valor is None:
-                avisar(self.mensaje, "El valor debe estar entre 1 y 99.", "warn")
+                avisar(self.mensaje, "Escribe un valor (número, letra o símbolo).", "warn")
                 return
             if self.datos.arbol.raiz is None:
                 avisar(self.mensaje, "El árbol está vacío. Crea algunos nodos primero.", "warn")
@@ -118,9 +134,9 @@ class PaginaArbol(tk.Frame):
             self.camino = camino
             self.existe = encontrado
             if encontrado:
-                self.encontrado = valor
+                self.encontrado = camino[-1]
             self.dibujar()
-            ruta = " → ".join(str(n) for n in camino)
+            ruta = " → ".join(str(n.valor) for n in camino)
             if encontrado:
                 avisar(self.mensaje, f"Nodo {valor} encontrado. Camino: {ruta}", "ok")
             else:
@@ -132,7 +148,7 @@ class PaginaArbol(tk.Frame):
         try:
             valor = self.leer_valor()
             if valor is None:
-                avisar(self.mensaje, "El valor debe estar entre 1 y 99.", "warn")
+                avisar(self.mensaje, "Escribe un valor (número, letra o símbolo).", "warn")
                 return
             if self.datos.arbol.raiz is None:
                 avisar(self.mensaje, "El árbol está vacío, no hay nada que eliminar.", "warn")
@@ -153,41 +169,34 @@ class PaginaArbol(tk.Frame):
                 avisar(self.mensaje, "El árbol está vacío, no hay nada que recorrer.", "warn")
                 return
             if nombre == "Preorden":
-                lista = arbol.preorden()
+                lista = arbol.nodos_preorden()
             elif nombre == "Inorden":
-                lista = arbol.inorden()
+                lista = arbol.nodos_inorden()
             else:
-                lista = arbol.postorden()
+                lista = arbol.nodos_postorden()
             self.limpiar_resaltado()
             self.secuencia = lista
-            self.lbl_recorrido.config(text=nombre + ": " + " → ".join(str(n) for n in lista))
+            self.lbl_recorrido.config(text=nombre + ": " + " → ".join(str(n.valor) for n in lista))
             self.dibujar()
             avisar(self.mensaje, f"Recorrido {nombre} listo ({len(lista)} nodos).", "info")
         except Exception as error:
             avisar(self.mensaje, "Ocurrió un problema: " + str(error), "error")
 
-    def buscar_nodo(self, valor):
-        actual = self.datos.arbol.raiz
-        while actual is not None and actual.valor != valor:
-            if valor < actual.valor:
-                actual = actual.izq
-            else:
-                actual = actual.der
-        return actual
-
     def calcular_posiciones(self, nodo, nivel, posiciones, aristas, info):
+        # Las posiciones se guardan por nodo y no por valor, así dos nodos con el mismo valor
+        # se dibujan cada uno en su lugar.
         if nodo is None:
             return
         self.calcular_posiciones(nodo.izq, nivel + 1, posiciones, aristas, info)
-        posiciones[nodo.valor] = (info["contador"], nivel)
+        posiciones[nodo] = (info["contador"], nivel)
         info["contador"] = info["contador"] + 1
         if nivel > info["nivel_max"]:
             info["nivel_max"] = nivel
         self.calcular_posiciones(nodo.der, nivel + 1, posiciones, aristas, info)
         if nodo.izq is not None:
-            aristas.append((nodo.valor, nodo.izq.valor))
+            aristas.append((nodo, nodo.izq))
         if nodo.der is not None:
-            aristas.append((nodo.valor, nodo.der.valor))
+            aristas.append((nodo, nodo.der))
 
     def dibujar(self):
         c = self.canvas
@@ -206,15 +215,21 @@ class PaginaArbol(tk.Frame):
         info = {"contador": 0, "nivel_max": 0}
         self.calcular_posiciones(arbol.raiz, 0, posiciones, aristas, info)
 
-        separacion_x = 48
-        separacion_y = 74
-        ancho_arbol = 80 + (info["contador"] - 1) * separacion_x
+        # El tamaño del círculo crece si algún valor es largo (por ejemplo 123456 o "fresa").
+        ancho_texto = 0
+        for nodo in posiciones:
+            ancho_texto = max(ancho_texto, self.fuente_nodo.measure(str(nodo.valor)))
+        radio = max(RADIO, ancho_texto / 2 + 7)
+        separacion_x = max(48, 2 * radio + 8)
+        separacion_y = max(74, 2 * radio + 30)
+        margen = max(40, radio + 14)
+        ancho_arbol = 2 * margen + (info["contador"] - 1) * separacion_x
         desfase = max(0, (ancho_canvas - ancho_arbol) / 2)
-        alto_arbol = 50 + info["nivel_max"] * separacion_y + 60
+        alto_arbol = 2 * margen + info["nivel_max"] * separacion_y + 30
 
-        def coordenadas(valor):
-            columna, nivel = posiciones[valor]
-            return desfase + 40 + columna * separacion_x, 40 + nivel * separacion_y
+        def coordenadas(nodo):
+            columna, nivel = posiciones[nodo]
+            return desfase + margen + columna * separacion_x, margen + nivel * separacion_y
 
         color_camino = VERDE_BRILLANTE
         if not self.existe:
@@ -231,12 +246,11 @@ class PaginaArbol(tk.Frame):
             else:
                 c.create_line(x1, y1, x2, y2, fill=GRIS_AZUL, width=2)
 
-        for valor in posiciones:
-            x, y = coordenadas(valor)
-            nodo = self.buscar_nodo(valor)
-            if valor in self.camino:
+        for nodo in posiciones:
+            x, y = coordenadas(nodo)
+            if nodo in self.camino:
                 color = color_camino
-            elif valor == arbol.raiz.valor:
+            elif nodo is arbol.raiz:
                 color = VIOLETA
             elif nodo.izq is None and nodo.der is None:
                 color = TURQUESA
@@ -244,17 +258,19 @@ class PaginaArbol(tk.Frame):
                 color = AZUL
             borde = "white"
             grosor = 2
-            if valor == self.encontrado:
+            if nodo is self.encontrado:
                 borde = VERDE_FUERTE
                 grosor = 4
-            if valor in self.secuencia:
+            if nodo in self.secuencia:
                 borde = AMBAR
                 grosor = 4
-            circulo(c, x, y, RADIO, color, borde, grosor)
-            c.create_text(x, y, text=str(valor), font=(FUENTE, 11, "bold"), fill="white")
-            if valor in self.secuencia:
-                orden = self.secuencia.index(valor) + 1
-                c.create_oval(x + 8, y - 30, x + 28, y - 10, fill=AMBAR, outline="white")
-                c.create_text(x + 18, y - 20, text=str(orden), font=("Consolas", 8, "bold"), fill="white")
+            circulo(c, x, y, radio, color, borde, grosor)
+            c.create_text(x, y, text=str(nodo.valor), font=self.fuente_nodo, fill="white")
+            if nodo in self.secuencia:
+                orden = self.secuencia.index(nodo) + 1
+                bx = x + radio - 2
+                by = y - radio
+                c.create_oval(bx - 10, by - 10, bx + 10, by + 10, fill=AMBAR, outline="white")
+                c.create_text(bx, by, text=str(orden), font=("Consolas", 8, "bold"), fill="white")
 
         c.config(scrollregion=(0, 0, max(ancho_canvas, ancho_arbol + 20), max(alto_canvas, alto_arbol)))
