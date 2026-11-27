@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 from config import *
-from interfaz.componentes import avisar
+from interfaz.componentes import avisar, BotonBase
 from estructuras.datos import Datos
 from paginas.menu import PaginaMenu
 from paginas.arreglos import PaginaArreglos
@@ -113,7 +113,7 @@ class Ventana(tk.Tk):
         fila.pack(fill="x", pady=1)
         franja = tk.Frame(fila, bg=CACAO, width=5)
         franja.pack(side="left", fill="y")
-        boton = tk.Button(fila, text=texto, anchor="w", font=(FUENTE, 11), bg=CACAO,
+        boton = BotonBase(fila, text=texto, anchor="w", font=(FUENTE, 11), bg=CACAO,
                           fg=TEXTO_CLARO, activebackground=CACAO_HOVER,
                           activeforeground=TEXTO_CLARO, relief="flat", bd=0, padx=16,
                           pady=10, cursor="hand2", command=lambda: self.mostrar(clave))

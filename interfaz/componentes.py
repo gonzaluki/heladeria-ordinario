@@ -1,6 +1,28 @@
+import sys
 import tkinter as tk
 from tkinter import ttk
 from config import *
+
+
+class BotonMac(tk.Label):
+    # En macOS, tk.Button ignora el color de fondo (bg) y siempre pinta el botón gris del
+    # sistema, así que el texto blanco casi no se ve. En Mac el botón se arma con un Label,
+    # que sí respeta los colores, y se le agrega el clic a mano.
+    def __init__(self, padre, command=None, **opciones):
+        tk.Label.__init__(self, padre, **opciones)
+        self.comando = command
+        self.bind("<ButtonRelease-1>", self.al_soltar_clic)
+
+    def al_soltar_clic(self, evento):
+        # Igual que un botón normal: solo cuenta si se suelta el clic encima del botón.
+        if self.comando and self.winfo_containing(evento.x_root, evento.y_root) is self:
+            self.comando()
+
+
+if sys.platform == "darwin":
+    BotonBase = BotonMac
+else:
+    BotonBase = tk.Button
 
 COLORES_BOTON = {
     "principal": (CORAL, CORAL_OSCURO, "white"),
@@ -17,10 +39,10 @@ COLORES_MENSAJE = {
     "info": ("#EAF0FA", "#2B4A7A", "ℹ"),
 }
 
-class Boton(tk.Button):
+class Boton(BotonBase):
     def __init__(self, padre, texto, comando, tipo="principal"):
         color, hover, letra = COLORES_BOTON[tipo]
-        tk.Button.__init__(self, padre, text=texto, command=comando, bg=color, fg=letra,
+        BotonBase.__init__(self, padre, text=texto, command=comando, bg=color, fg=letra,
                            activebackground=hover, activeforeground=letra, relief="flat",
                            bd=0, cursor="hand2", padx=14, pady=8, font=F_NEGRITA)
         self.color_normal = color
